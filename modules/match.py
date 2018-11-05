@@ -19,8 +19,8 @@ img_path = os.getcwd() + "/var"
 #     'b040ad4b6a95ddaa8ad86f0762ebc828', storage={'root_dir': img_path})
 # flickr_crawler.crawl(
 #     max_num=100,
-#     tags='orvieto cathedral, italy, architecture',
-#     group_id='21041011@N00',
+#     tags='duomo',
+#     group_id='1486114@N20',
 #     min_upload_date=date(2008, 5, 1))
 
 
@@ -32,7 +32,7 @@ def feature_extraction(img_path):
                      'image_of_cathedral.jpg'))
     img_building = cv2.cvtColor(
         img_building,
-        cv2.COLOR_BGR2RGB)  # Convert from cv's BRG default color order to RGB
+        cv2.COLOR_BGR2GRAY)  # Convert from cv's BRG default color order to RGB
 
     orb = cv2.ORB_create(
     )  # OpenCV 3 backward incompatibility: Do not create a detector with `cv2.ORB()`.
@@ -44,11 +44,12 @@ def feature_extraction(img_path):
         flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)  # Draw circles.
     plt.figure(figsize=(16, 16))
     plt.title('ORB Interest Points')
-    img_db_dict = dict()
-    for i in range(1, 10):
-        pic_name = "/00000" + str(i) + ".jpg"
+    dist_dict = []
+    for i in range(1, 40):
+        pic_name = "/" + "0" * (6 - len(str(i))) + str(i) + ".jpg"
         test_img = cv2.imread(img_path + pic_name)
-        print("path", img_path + pic_name)
+        test_img = cv2.cvtColor(test_img, cv2.COLOR_BGR2GRAY)
+        # print("path", img_path + pic_name)
         test_key_points, test_description = orb.detectAndCompute(
             test_img, None)
 
@@ -63,24 +64,26 @@ def feature_extraction(img_path):
         matches = sorted(
             matches, key=lambda x: x.distance
         )  # Sort matches by distance.  Best come first.
-        # print("matches", matches)
-        print("matches", matches[:10])
-        # dist = scipy.spatial.distance.cdist(test_description, description,
-        #                                     'cosine').reshape(-1)
-        # img_db_dict[i] = test_description
-        # print("i hope it works", dist)
-        img_matches = cv2.drawMatches(
-            img_building,
-            key_points,
-            test_img,
-            test_key_points,
-            matches[:10],
-            test_img,
-            flags=2)  # Show top 10 matches
+        print("matches", len(matches))
+        draw_params = dict(
+            singlePointColor=None, matchColor=(0, 255, 0), flags=2)
+        img_matches = cv2.drawMatches(img_building, key_points, test_img,
+                                      test_key_points, matches[:10], None,
+                                      **draw_params)  # Show top 10 matches
         plt.figure(figsize=(16, 16))
         plt.title("test")
         plt.imshow(img_matches)
         plt.show()
+        # calculate euclidean distance
+
+        dist = 0
+        for j in range(10):
+            dist += matches[j].distance
+        # print(i, dist)
+        dist_dict.append([i, dist])
+    print(len(dist_dict))
+    dist_dict = sorted(dist_dict, key=lambda x: x[1])
+    print(dist_dict[:10])
 
 
 def run(img_path):
