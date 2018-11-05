@@ -33,15 +33,18 @@ class MyImageDownloader(ImageDownloader):
 
 img_path = os.getcwd() + "/var"
 
-# if not os.path.exists(img_path):
-#     os.makedirs(img_path)
-# flickr_crawler = FlickrImageCrawler(
-#     'b040ad4b6a95ddaa8ad86f0762ebc828', storage={'root_dir': img_path})
-# flickr_crawler.crawl(
-#     max_num=100,
-#     tags='orvieto cathedral, italy, architecture',
-#     group_id='21041011@N00',
-#     min_upload_date=date(2008, 5, 1))
+if not os.path.exists(img_path):
+    os.makedirs(img_path)
+flickr_crawler = FlickrImageCrawler(
+    'b040ad4b6a95ddaa8ad86f0762ebc828',
+    downloader_cls=MyImageDownloader,
+    downloader_threads=4,
+    storage={'root_dir': img_path})
+flickr_crawler.crawl(
+    max_num=300,
+    tags='duomo',
+    group_id='99108923@N00',
+    min_upload_date=date(2005, 5, 1))
 
 
 # Feature extractor
@@ -92,8 +95,7 @@ def feature_extraction(img_path):
         plt.show()
 
 
-def run(img_path):
-    feature_extraction(img_path)
+# def run(img_path):
+#     feature_extraction(img_path)
 
-
-run(img_path)
+# run(img_path)
