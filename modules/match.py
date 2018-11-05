@@ -45,23 +45,25 @@ class MyImageDownloader(ImageDownloader):
 
 
 img_path = os.getcwd() + "/var"
+'''
+# Crawl Flickr to obtain max 500 photos of cathedrals in Italy
+title_dict = dict()
+info_path = os.getcwd() + "/var/info.json"
 
-# title_dict = dict()
-# info_path = os.getcwd() + "/var/info.json"
-
-# if not os.path.exists(img_path):
-#     os.makedirs(img_path)
-# flickr_crawler = FlickrImageCrawler(
-#     'b040ad4b6a95ddaa8ad86f0762ebc828',
-#     downloader_cls=MyImageDownloader,
-#     downloader_threads=4,
-#     storage={'root_dir': img_path})
-# flickr_crawler.crawl(
-#     max_num=500,
-#     tags='florence',
-#     extras='description',
-#     group_id='99108923@N00',
-#     min_upload_date=date(2005, 5, 1))
+if not os.path.exists(img_path):
+    os.makedirs(img_path)
+flickr_crawler = FlickrImageCrawler(
+    'b040ad4b6a95ddaa8ad86f0762ebc828',
+    downloader_cls=MyImageDownloader,
+    downloader_threads=4,
+    storage={'root_dir': img_path})
+flickr_crawler.crawl(
+    max_num=500,
+    tags='florence',
+    extras='description',
+    group_id='99108923@N00',
+    min_upload_date=date(2005, 5, 1))
+'''
 
 
 # Feature extractor
@@ -76,19 +78,23 @@ def feature_extraction(img_path):
 
     orb = cv2.ORB_create()
     key_points, description = orb.detectAndCompute(img_building, None)
+    '''
+    # Plot the feature points
+    
     img_building_keypoints = cv2.drawKeypoints(
         img_building,
         key_points,
         img_building,
         color=(255, 0, 0),
         flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)  # Draw circles.
-    # plt.figure(figsize=(16, 16))
-    # plt.title('ORB Interest Points')
-    # plt.imshow(img_building_keypoints)
-    # plt.show()
+    plt.figure(figsize=(16, 16))
+    plt.title('ORB Interest Points')
+    plt.imshow(img_building_keypoints)
+    plt.show()
+    '''
 
     dist_dict = []
-    lowe_ratio = 0.89
+
     for i in range(1, 426):
         pic_name = "/" + "0" * (6 - len(str(i))) + str(i) + ".jpg"
         test_img = cv2.imread(img_path + pic_name)
@@ -124,19 +130,22 @@ def feature_extraction(img_path):
         # Plot figure
 
         # Below are the code that I use bf.match to match key points
+
         bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
         matches = bf.match(description, test_description)
-        # draw_params = dict(
-        #     singlePointColor=None, matchColor=(255, 0, 0), flags=2)
-        # img_matches = cv2.drawMatches(img_building, key_points, test_img,
-        #                               test_key_points, good[:10], None,
-        #                               **draw_params)  # Show top 10 matches
-        # plt.figure(figsize=(16, 16))
-        # plt.title("test")
-        # plt.imshow(img_matches)
-        # plt.show()
+        '''
+        draw_params = dict(
+            singlePointColor=None, matchColor=(255, 0, 0), flags=2)
+        img_matches = cv2.drawMatches(img_building, key_points, test_img,
+                                      test_key_points, good[:10], None,
+                                      **draw_params)  # Show top 10 matches
+        plt.figure(figsize=(16, 16))
+        plt.title("test")
+        plt.imshow(img_matches)
+        plt.show()
+        '''
 
-        # calculate euclidean distancedist = 0
+        # calculate euclidean distance
         dist = 0
         for j in range(10):
             dist += matches[j].distance
