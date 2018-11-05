@@ -115,8 +115,8 @@ def read_idx(mnist_filename):
 
 
 # kNN
+# calculate the Euclidean disrance between two images
 def euclideanDistance(test, training):
-    # print(test.shape, training.shape)
     dist = np.linalg.norm(test - training)
     return math.sqrt(dist)
 
@@ -133,45 +133,45 @@ def getNeighbors(trainingSet, testInstance, k, mnist_train_labels):
     distances.sort(key=operator.itemgetter(1))
     neighbors = []
     for i in range(k):
+        # Append the correct label and the distance
         neighbors.append(mnist_train_labels[distances[i][0]])
     return neighbors
 
 
 def getResponse(neighbors):
-    classVotes = {}
+    majority = {}
     for x in neighbors:
         response = x
-        if response in classVotes:
-            classVotes[response] += 1
+        if response in majority:
+            majority[response] += 1
         else:
-            classVotes[response] = 1
+            majority[response] = 1
     sortedVotes = sorted(
-        classVotes.items(), key=operator.itemgetter(1), reverse=True)
+        majority.items(), key=operator.itemgetter(1), reverse=True)
     return sortedVotes[0][0]
 
 
+# Crop and resize using information from the dataset bounding box
 def crop_img(img_path, i, y, h, x, w):
     img = cv2.imread(img_path + "/" + str(i) + ".png")
     crop_img = img[y:y + h, x:x + w]
     resized_image = cv2.resize(crop_img, (28, 28))
-    # cv2.imshow("test" + str(i), resized_image)
-    # cv2.waitKey(0)
     return resized_image
 
 
-def compute_d_dimensional_mean_vector(images_01):
+def compute_eigen_basis(images_01):
+    # image_01 is the picture data set being passed in
     array_list = []
-    # print("input shape", images_01.shape)
     images_train_array = np.zeros((60000, 784))
     mean_vec = np.zeros((60000, 1))
+    # Reshape the array into (60000, 784)
     for i in range(images_01.shape[0]):
         images_train_array[i] = images_01[i].flatten('F')
         mean_vec[i] = np.mean(images_train_array[i])
-
-    # print('Mean Vector:\n', mean_vec.shape)
+    # Subtract mean vector from it
     after_sub_mean_vec = images_train_array - mean_vec
+    # Calculate the covariance matrix
     cov_mat = np.dot(np.transpose(after_sub_mean_vec), after_sub_mean_vec)
-
     eig_val_cov, eig_vec_cov = np.linalg.eig(cov_mat)
 
     # Make a list of (eigenvalue, eigenvector) tuples
@@ -180,13 +180,14 @@ def compute_d_dimensional_mean_vector(images_01):
     # Sort by eigen values
     eig_pairs.sort(key=lambda x: x[0], reverse=True)
 
-    # print("eigen", eig_pairs[0][1].shape)
-    x_std = StandardScaler().fit_transform(images_train_array)
+    # Pick the top 10 eigen vectors with the largest eigne values
+    eigen_basis = []
 
     for i in range(10):
         testarray = np.array(eig_pairs[i][1], dtype=float)
-        # plt.imshow(testarray.reshape(28, 28))
-        # plt.show()
+        eigen_basis.append(eig_pairs[i][1])
+    eigen_basis = np.array(eigen_basis)
+    return eigen_basis
 
 
 def run(config_path, pipeline_config_path=None):
@@ -215,45 +216,57 @@ def run(config_path, pipeline_config_path=None):
                                   (mnist_train_images.shape[0], 784))
         test_images = np.reshape(mnist_test_images,
                                  (mnist_test_images.shape[0], 784))
-        # compute_d_dimensional_mean_vector(mnist_train_images)
+        eigen_basis = compute_eigen_basis(mnist_train_images)
         mnist_total_num = 0
         mnist_wrong = 0
+        # Apply PCA to the training and test images
+        train = np.dot(train_images, eigen_basis.T)
+        test = np.dot(test_images, eigen_basis.T)
+        '''
+        plt.imshow(testarray.reshape(28, 28))
+        plt.show()
         pca = PCA(n_components=2)
         principal_components = pca.fit_transform(train_images)
-        for i in range(100):
+        '''
+        for i in range(500):
             mnist_total_num += 1
-            # principal_components_test = pca.transform(test_images[i].reshape(
-            #     1, 784))
-            # neighbors = getNeighbors(principal_components,
-            #                          principal_components_test, 3)
-            neighbors = getNeighbors(train_images, test_images[i], 11,
-                                     mnist_train_labels)
+            neighbors = getNeighbors(train, test[i], 3, mnist_train_labels)
             res = getResponse(neighbors)
             if res != mnist_test_labels[i]:
                 print(mnist_test_labels[i], res)
                 mnist_wrong += 1
-        #{'height': [16.0], 'label': [6.0], 'left': [61.0], 'top': [6.0], 'width': [11.0]}
-        # svhn_total_num = 0
-        # svhn_correct = 0
-        # for i in range(300):
-        #     # print(i, dsf.getBbox(i)['label'])
-        #     for j in range(len(dsf.getBbox(i)['label'])):
-        #         svhn_total_num += 1
-        #         img = crop_img(base_svhn_path, i + 1,
-        #                        int(dsf.getBbox(i)['top'][j]),
-        #                        int(dsf.getBbox(i)['height'][j]),
-        #                        int(dsf.getBbox(i)['left'][j]),
-        #                        int(dsf.getBbox(i)['width'][j]))
-        #         img = cv2.cvtColor(img,
-        #                  cv2.COLOR_BGR2GRAY)
-        #         neighbors = getNeighbors(principal_components,
-        #                             principal_components_test, 3)
-        #         res = getResponse(neighbors, mnist_train_labels)
-        #         if res == int(
-        #                 dsf.getBbox(i)['label'][j]):
-        #             svhn_correct += 1
+        '''
+        Format of the bounding box
+        {
+            'height': [16.0],
+            'label': [6.0],
+            'left': [61.0],
+            'top': [6.0],
+            'width': [11.0]
+        }
+        '''
+        svhn_total_num = 0
+        svhn_correct = 0
+        for i in range(300):
+            print(i)
+            for j in range(len(dsf.getBbox(i)['label'])):
+                svhn_total_num += 1
+                img = crop_img(base_svhn_path, i + 1,
+                               int(dsf.getBbox(i)['top'][j]),
+                               int(dsf.getBbox(i)['height'][j]),
+                               int(dsf.getBbox(i)['left'][j]),
+                               int(dsf.getBbox(i)['width'][j]))
 
-        # print("correct rate:", correct, float(correct) / float(total_num))
+                img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY).flatten('F')
+                img = np.dot(img, eigen_basis.T)
+                # Apply knn
+                neighbors = getNeighbors(train, img, 3, mnist_train_labels)
+                res = getResponse(neighbors)
+                if res == int(dsf.getBbox(i)['label'][j]):
+                    svhn_correct += 1
+
+        print("correct rate:", svhn_correct,
+              float(svhn_correct) / float(svhn_total_num))
         '''CALL YOUR FUNCTIONS HERE.
 
         Please call of your functions here. For this problem, we ask you to
@@ -268,8 +281,7 @@ def run(config_path, pipeline_config_path=None):
         '''
         # Make sure you assign values to these two variables
         mnist_error_rate = mnist_wrong / mnist_total_num
-        svhn_error_rate = 0
-        # (svhn_total_num - svhn_correct) / svhn_total_num
+        svhn_error_rate = (svhn_total_num - svhn_correct) / svhn_total_num
 
         error_rate_dic = defaultdict(lambda: defaultdict())
         error_rate_dic["error_rates"]["mnist_error_rate"] = mnist_error_rate

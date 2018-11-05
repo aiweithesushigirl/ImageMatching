@@ -51,19 +51,22 @@ img_path = os.getcwd() + "/var"
 title_dict = dict()
 info_path = os.getcwd() + "/var/info.json"
 
-# if not os.path.exists(img_path):
-#     os.makedirs(img_path)
-# flickr_crawler = FlickrImageCrawler(
-#     'b040ad4b6a95ddaa8ad86f0762ebc828',
-#     downloader_cls=MyImageDownloader,
-#     downloader_threads=5,
-#     storage={'root_dir': img_path})
-# flickr_crawler.crawl(
-#     max_num=500,
-#     tags='florence',
-#     extras='description',
-#     group_id='99108923@N00',
-#     min_upload_date=date(2005, 5, 1))
+
+def get_images(img_path):
+    if not os.path.exists(img_path):
+        os.makedirs(img_path)
+    flickr_crawler = FlickrImageCrawler(
+        'b040ad4b6a95ddaa8ad86f0762ebc828',
+        downloader_cls=MyImageDownloader,
+        downloader_threads=5,
+        storage={'root_dir': img_path})
+    flickr_crawler.crawl(
+        max_num=500,
+        tags='florence',
+        extras='description',
+        group_id='99108923@N00',
+        min_upload_date=date(2005, 5, 1))
+
 
 # group_id='50035595%N00',
 
@@ -74,12 +77,11 @@ def feature_extraction(img_path):
     img_building = cv2.imread(
         os.path.join("/Users/wuaiwei/Desktop/EECS442/eta/HW_3/data/",
                      'image_of_cathedral.jpg'))
-    img_building = cv2.cvtColor(
+    img_building_gray = cv2.cvtColor(
         img_building,
-        cv2.COLOR_BGR2RGB)  # Convert from cv's BRG default color order to RGB
+        cv2.COLOR_BGR2GRAY)  # Convert from cv's BRG default color order to RGB
 
     orb = cv2.ORB_create()
-    key_points, description = orb.detectAndCompute(img_building, None)
     '''
     # Plot the feature points
     
@@ -100,37 +102,13 @@ def feature_extraction(img_path):
     for i in range(1, 413):
         pic_name = "/" + "0" * (6 - len(str(i))) + str(i) + ".jpg"
         test_img = cv2.imread(img_path + pic_name)
-        test_img = cv2.cvtColor(test_img, cv2.COLOR_BGR2RGB)
+        test_img_gray = cv2.cvtColor(test_img, cv2.COLOR_BGR2GRAY)
         test_key_points, test_description = orb.detectAndCompute(
-            test_img, None)
-        # img_building = cv2.resize(img_building, test_img.shape)
-        # key_points, description = orb.detectAndCompute(img_building, None)
-        test_img_keypoints = cv2.drawKeypoints(
-            test_img,
-            test_key_points,
-            test_img,
-            color=(255, 0, 0),
-            flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
-        '''
-        bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=False)
-        matches = bf.knnMatch(description, test_description, k=2)
-
-        # Apply ratio test
-        good = []
-        for m, n in matches:
-            if m.distance < 0.89 * n.distance:
-                good.append([m, n])
-
-        good = sorted(
-            good, key=lambda x: x[0].distance**2 + x[1].distance**2
-        )  # Sort matches by distance.  Best come first.
-        dist = 0
-        for j in range(10):
-            dist += good[j][0].distance**2 + good[j][1].distance**2
-        dist_dict.append([i, dist])
-        '''
-
-        # Plot figure
+            test_img_gray, None)
+        img_building_resize = cv2.resize(
+            img_building_gray, (test_img.shape[1], test_img.shape[0]))
+        key_points, description = orb.detectAndCompute(img_building_resize,
+                                                       None)
 
         # Below are the code that I use bf.match to match key points
         bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
@@ -141,38 +119,34 @@ def feature_extraction(img_path):
 
         # draw_params = dict(
         #     singlePointColor=None, matchColor=(255, 0, 0), flags=2)
-        # img_matches = cv2.drawMatches(img_building, key_points, test_img,
-        #                               test_key_points, matches[:10], None,
-        #                               **draw_params)  # Show top 10 matches
+        # img_matches = cv2.drawMatches(
+        #     img_building_resize, key_points, test_img_gray, test_key_points,
+        #     matches[:10], None, **draw_params)  # Show top 10 matches
         # plt.figure(figsize=(16, 16))
         # plt.title("test")
         # plt.imshow(img_matches)
         # plt.show()
 
-        if (len(matches) > 240):
-            # assuming matches stores the matches found and
-            # returned by bf.match(des_model, des_frame)
-            # differenciate between source points and destination points
-            src_pts = np.float32([key_points[m.queryIdx].pt
-                                  for m in matches][:75]).reshape(-1, 1, 2)
-            dst_pts = np.float32([
-                test_key_points[m.trainIdx].pt for m in matches
-            ][:75]).reshape(-1, 1, 2)
-            # compute Homography
-            M, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 5.0)
-            print("homo", i)
+        src_pts = np.float32([key_points[m.queryIdx].pt
+                              for m in matches])[:15].reshape(-1, 1, 2)
+        dst_pts = np.float32([test_key_points[m.trainIdx].pt
+                              for m in matches])[:15].reshape(-1, 1, 2)
+        # compute Homography
+        M, mask = cv2.findHomography(dst_pts, src_pts, cv2.RANSAC, 5.0)
 
-            size = (test_img.shape[1], test_img.shape[0])
-            # project the given image into the shape of the test_img
-            dst = cv2.warpPerspective(img_building, M, size)
-            # plt.imshow(dst)
-            # plt.show()
-            # calculate euclidean distance
-            dist = np.linalg.norm(test_img - dst)
-            # if dist < 303805:
-            #     plt.imshow(dst)
-            #     plt.show()
-            dist_dict.append([i, dist])
+        print("homo", i)
+        size = (img_building_resize.shape[1], img_building_resize.shape[0])
+        # project the given image into the shape of the test_img
+        dst = cv2.warpPerspective(test_img, M, size)
+
+        print(dst.shape)
+        # plt.imshow(dst)
+        # plt.show()
+        # calculate euclidean distance
+        dist = np.linalg.norm(img_building_resize -
+                              cv2.cvtColor(dst, cv2.COLOR_BGR2GRAY))
+        print("dist", dist)
+        dist_dict.append([i, dist])
 
     dist_dict = sorted(dist_dict, key=lambda x: x[1])
     return (dist_dict[:15])
@@ -199,9 +173,45 @@ def find_match(dist_dict):
 
 
 def run(img_path):
-
+    # get_images(img_path)
     dist_dict = feature_extraction(img_path)
     find_match(dist_dict)
 
 
 run(img_path)
+
+# test_img_keypoints = cv2.drawKeypoints(
+#     test_img,
+#     test_key_points,
+#     test_img,
+#     color=(255, 0, 0),
+#     flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+# '''
+# # use knn
+# bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=False)
+# matches = bf.knnMatch(description, test_description, k=2)
+
+# # Apply ratio test
+# good = []
+# for m, n in matches:
+#     if m.distance < 0.89 * n.distance:
+#         good.append([m, n])
+
+# good = sorted(
+#     good, key=lambda x: x[0].distance**2 + x[1].distance**2
+# )  # Sort matches by distance.  Best come first.
+# dist = 0
+# for j in range(10):
+#     dist += good[j][0].distance**2 + good[j][1].distance**2
+# dist_dict.append([i, dist])
+# '''
+
+# draw_params = dict(
+#     singlePointColor=None, matchColor=(255, 0, 0), flags=2)
+# img_matches = cv2.drawMatches(img_building, key_points, test_img,
+#                               test_key_points, matches[:10], None,
+#                               **draw_params)  # Show top 10 matches
+# # plt.figure(figsize=(16, 16))
+# plt.title("test")
+# plt.imshow(img_matches)
+# plt.show()
