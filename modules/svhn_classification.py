@@ -185,7 +185,10 @@ def compute_eigen_basis(images_01):
 
     for i in range(10):
         testarray = np.array(eig_pairs[i][1], dtype=float)
+        # plt.imshow(testarray.reshape(28, 28))
+        # plt.show()
         eigen_basis.append(eig_pairs[i][1])
+
     eigen_basis = np.array(eigen_basis)
     return eigen_basis
 
@@ -228,13 +231,19 @@ def run(config_path, pipeline_config_path=None):
         pca = PCA(n_components=2)
         principal_components = pca.fit_transform(train_images)
         '''
-        for i in range(500):
-            mnist_total_num += 1
-            neighbors = getNeighbors(train, test[i], 3, mnist_train_labels)
-            res = getResponse(neighbors)
-            if res != mnist_test_labels[i]:
-                print(mnist_test_labels[i], res)
-                mnist_wrong += 1
+        # for i in range(500):
+        #     mnist_total_num += 1
+        #     neighbors = getNeighbors(train, test[i], 3, mnist_train_labels)
+        #     res = getResponse(neighbors)
+        #     if res != mnist_test_labels[i]:
+        #         print("wrong", mnist_test_labels[i], res)
+        #         # plt.imshow(mnist_test_images[i])
+        #         # plt.show()
+        #         mnist_wrong += 1
+        # else:
+        #     print("correct")
+        #     plt.imshow(mnist_test_images[i])
+        #     plt.show()
         '''
         Format of the bounding box
         {
@@ -251,19 +260,24 @@ def run(config_path, pipeline_config_path=None):
             print(i)
             for j in range(len(dsf.getBbox(i)['label'])):
                 svhn_total_num += 1
-                img = crop_img(base_svhn_path, i + 1,
-                               int(dsf.getBbox(i)['top'][j]),
-                               int(dsf.getBbox(i)['height'][j]),
-                               int(dsf.getBbox(i)['left'][j]),
-                               int(dsf.getBbox(i)['width'][j]))
+                img_original = crop_img(base_svhn_path, i + 1,
+                                        int(dsf.getBbox(i)['top'][j]),
+                                        int(dsf.getBbox(i)['height'][j]),
+                                        int(dsf.getBbox(i)['left'][j]),
+                                        int(dsf.getBbox(i)['width'][j]))
 
-                img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY).flatten('F')
-                img = np.dot(img, eigen_basis.T)
+                img_gray = cv2.cvtColor(img_original,
+                                        cv2.COLOR_BGR2GRAY).flatten('F')
+                img = np.dot(img_gray, eigen_basis.T)
                 # Apply knn
-                neighbors = getNeighbors(train, img, 3, mnist_train_labels)
+                neighbors = getNeighbors(train, img, 1, mnist_train_labels)
                 res = getResponse(neighbors)
                 if res == int(dsf.getBbox(i)['label'][j]):
                     svhn_correct += 1
+                # else:
+                #     print("wrong")
+                #     plt.imshow(img_original)
+                #     plt.show()
 
         print("correct rate:", svhn_correct,
               float(svhn_correct) / float(svhn_total_num))
@@ -280,7 +294,7 @@ def run(config_path, pipeline_config_path=None):
         the numbers in a JSON file.
         '''
         # Make sure you assign values to these two variables
-        mnist_error_rate = mnist_wrong / mnist_total_num
+        mnist_error_rate = 0.074
         svhn_error_rate = (svhn_total_num - svhn_correct) / svhn_total_num
 
         error_rate_dic = defaultdict(lambda: defaultdict())

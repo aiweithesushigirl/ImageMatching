@@ -32,6 +32,7 @@ class MyImageDownloader(ImageDownloader):
             with open(info_path, mode='w') as f:
                 f.write(json.dumps(a, indent=2))
         else:
+            # We can obtain information from the title of the photo
             with open(info_path) as feedsjson:
                 feeds = json.load(feedsjson)
                 entry = {
@@ -46,12 +47,12 @@ class MyImageDownloader(ImageDownloader):
 
 
 img_path = os.getcwd() + "/var"
-
 # Crawl Flickr to obtain max 500 photos of cathedrals in Italy
 title_dict = dict()
 info_path = os.getcwd() + "/var/info.json"
 
 
+# Get images of cathedrals in Italy
 def get_images(img_path):
     if not os.path.exists(img_path):
         os.makedirs(img_path)
@@ -64,116 +65,73 @@ def get_images(img_path):
         max_num=500,
         tags='cathedral',
         extras='description',
-        group_id='92229480@N00',
+        group_id='92229480@N00',  #Umbria
         min_upload_date=date(2005, 5, 1))
 
 
-# group_id='50035595%N00',
-
-
 # Feature extractor
-def orb(img_path):
-    sift = cv2.xfeatures2d.SIFT_create()
-    img_building = cv2.imread(
-        os.path.join("/Users/wuaiwei/Desktop/EECS442/eta/HW_3/data/",
-                     'image_of_cathedral.jpg'))
-    img_building_gray = cv2.cvtColor(
-        img_building,
-        cv2.COLOR_BGR2GRAY)  # Convert from cv's BRG default color order to RGB
-    key_points, description = sift.detectAndCompute(img_building_gray, None)
-
-    dist_dict = []
-
-    for i in range(1, 126):
-        pic_name = "/" + "0" * (6 - len(str(i))) + str(i) + ".jpg"
-        test_img = cv2.imread(img_path + pic_name)
-        test_img_gray = cv2.cvtColor(test_img, cv2.COLOR_BGR2GRAY)
-        test_key_points, test_description = sift.detectAndCompute(
-            test_img_gray, None)
-        # img_building_resize = cv2.resize(
-        #     img_building_gray, (test_img.shape[1], test_img.shape[0]))
-
-        # Below are the code that I use bf.match to match key points
-        bf = cv2.BFMatcher(cv2.NORM_L1, crossCheck=False)
-        matches = bf.match(description, test_description)
-        # matches = bf.knnMatch(description, test_description, k=5)
-
-        good = []
-        for m, n in matches:
-            if m.distance < 0.75 * n.distance:
-                good.append(m)
-
-        # good = sorted(
-        #     matches, key=lambda x: x.distance
-        # )  # Sort matches by distance. smallest come first.
-        # draw_params = dict(
-        #     singlePointColor=None, matchColor=(255, 0, 0), flags=2)
-        # img_matches = cv2.drawMatches(
-        #     img_building_resize, key_points, test_img_gray, test_key_points,
-        #     good[:20], None, **draw_params)  # Show top 10 matches
-        # # plt.figure(figsize=(16, 16))
-        # plt.title("test")
-        # plt.imshow(img_matches)
-        # plt.show()
-        if len(good) > 10:
-            dist_dict.append(i)
-
-    # dist_dict = sorted(dist_dict, key=lambda x: x[1])
-    return (dist_dict[:10])
-
-
 def feature_extraction(img_path):
     print(img_path)
     img_building = cv2.imread(
         os.path.join("/Users/wuaiwei/Desktop/EECS442/eta/HW_3/data/",
                      'image_of_cathedral.jpg'))
-    img_building_gray = cv2.cvtColor(
-        img_building, cv2.COLOR_BGR2GRAY
+    img_building = cv2.cvtColor(
+        img_building, cv2.COLOR_BGR2RGB
     )  # Convert from cv's BRG default color order to grayscale
     print("create sift descriptor")
     sift = cv2.xfeatures2d.SIFT_create(400)
 
     dist_dict = []
 
-    for i in range(1, 126):
+    for i in range(1, 127):  # loop through all of the photos in database
         pic_name = "/" + "0" * (6 - len(str(i))) + str(i) + ".jpg"
         test_img = cv2.imread(img_path + pic_name)
-        test_img_gray = cv2.cvtColor(test_img, cv2.COLOR_BGR2GRAY)
+        test_img = cv2.cvtColor(test_img, cv2.COLOR_BGR2RGB)
+        img_building = cv2.resize(img_building,
+                                  (test_img.shape[1], test_img.shape[0]))
+        # Get the feature points
+        key_points, description = sift.detectAndCompute(img_building, None)
         test_key_points, test_description = sift.detectAndCompute(
-            test_img_gray, None)
-        img_building_resize = cv2.resize(
-            img_building_gray, (test_img.shape[1], test_img.shape[0]))
-        key_points, description = sift.detectAndCompute(
-            img_building_resize, None)
-        print("start matching", i)
+            test_img, None)
+
+        print("==================start matching", i)
 
         FLANN_INDEX_KDTREE = 0
         index_params = dict(algorithm=FLANN_INDEX_KDTREE, trees=5)
-        search_params = dict(checks=50)
-        print("start matching", i)
+        search_params = dict(checks=55)
         flann = cv2.FlannBasedMatcher(index_params, search_params)
         matches = flann.knnMatch(description, test_description, k=2)
 
-        # store all the good matches as per Lowe's ratio test.
+        # store all the good matches according to Lowe's ratio test.
         good = []
         for m, n in matches:
-            if m.distance < 0.75 * n.distance:
+            if m.distance < 0.77 * n.distance:
                 good.append(m)
 
         if len(good) > 10:
+            draw_params = dict(
+                singlePointColor=None,
+                matchColor=(255, 0, 0),
+                flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+            # Visualize the ten matches
+            img_matches = cv2.drawMatches(img_building, key_points, test_img,
+                                          test_key_points, good[:10], None,
+                                          **draw_params)  # Show top 10 matches
+            # plt.figure(figsize=(16, 16))
+            # plt.title("test")
+            # plt.imshow(img_matches)
+            # plt.show()
+            plt.imsave("match" + str(i) + ".jpg", img_matches)
             dist_dict.append(i)
-
-    # dist_dict = sorted(dist_dict, key=lambda x: x[1])
     return (dist_dict)
 
 
 def find_match(dist_dict):
-    # print(dist_dict)
     img_path = os.getcwd() + "/var"
     info_path = os.getcwd() + "/var/info.json"
     with open(info_path) as feedsjson:
         feeds = json.load(feedsjson)
-        # print(feeds)
+        # Save the resultant images to the result folder
         for i in range(len(dist_dict)):
             for j in range(len(feeds)):
                 if feeds[j]['number'] == dist_dict[i]:
@@ -189,8 +147,7 @@ def find_match(dist_dict):
 
 def run(img_path):
     # get_images(img_path)
-    dist_dict = orb(img_path)
-    #dist_dict = feature_extraction(img_path)
+    dist_dict = feature_extraction(img_path)
     find_match(dist_dict)
 
 
